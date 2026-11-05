@@ -539,3 +539,25 @@ mod tests {
         assert!(offenders.is_empty(), "use crate::io::{{read_file, write_file}}: {offenders:#?}");
     }
 }
+
+#[cfg(all(test, windows))]
+mod throwaway_probe {
+    /// Throwaway: what real Windows does with the names the review asked about.
+    #[test]
+    fn probe() {
+        let base = std::env::temp_dir().join(format!("probe-{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        for name in ["COM1:", "NUL:", "NUL:x", "COM\u{b9}", "COM\u{b9}:", "COM1", "COM0", "LPT0.txt", "CON", "plain.txt", "plain.txt:stream"] {
+            let p = base.join(name);
+            let abs = std::path::absolute(&p);
+            let canon = std::fs::canonicalize(&p);
+            let made = std::fs::File::create(&p);
+            let listed: Vec<_> = std::fs::read_dir(&base).unwrap().flatten().map(|e| e.file_name()).collect();
+            println!("PROBE name={name:?} comps={:?} absolute={abs:?} canonicalize={canon:?} create={:?} listed={listed:?} device={}", p.components().last(), made.map(|_| "ok").map_err(|e| e.to_string()), super::is_device_name(name));
+        }
+        for p in [r"\\localhost\C$\Windows", r"\\LOCALHOST\c$\windows", r"\\127.0.0.1\C$\Windows", r"\\?\C:\Windows", r"c:\WINDOWS", r"\\?\UNC\LOCALHOST\C$\WINDOWS"] {
+            println!("PROBE path={p} canonicalize={:?}", std::fs::canonicalize(p));
+        }
+        let _ = std::fs::remove_dir_all(&base);
+    }
+}
